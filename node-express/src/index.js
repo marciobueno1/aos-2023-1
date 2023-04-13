@@ -1,9 +1,8 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
-import { v4 as uuidv4 } from "uuid";
 
-import models from "./models";
+import models, { sequelize } from "./models";
 import routes from "./routes";
 
 console.log("Hello Node.js project.");
@@ -15,10 +14,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use((req, res, next) => {
+// Custom Middleware
+
+app.use(async (req, res, next) => {
   req.context = {
     models,
-    me: models.users[1],
+    me: await models.User.findByLogin("rwieruch"),
   };
   next();
 });
@@ -44,5 +45,45 @@ app.delete("/", (req, res) => {
 });
 
 const port = process.env.PORT || 3000;
+const eraseDatabaseOnSync = process.env.ERASE_DATABASE_ON_SYNC === "true";
 
-app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+sequelize.sync({ force: eraseDatabaseOnSync }).then(async () => {
+  if (eraseDatabaseOnSync) {
+    await createUsersWithMessages();
+  }
+
+  app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+});
+
+const createUsersWithMessages = async () => {
+  await models.User.create(
+    {
+      username: "rwieruch",
+      messages: [
+        {
+          text: "Published the Road to learn React",
+        },
+      ],
+    },
+    {
+      include: [models.Message],
+    }
+  );
+
+  await models.User.create(
+    {
+      username: "ddavids",
+      messages: [
+        {
+          text: "Happy to release ...",
+        },
+        {
+          text: "Published a complete ...",
+        },
+      ],
+    },
+    {
+      include: [models.Message],
+    }
+  );
+};
